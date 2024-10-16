@@ -1,0 +1,97 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Crypto Price Chart</title>
+    <script src="https://cdn.plot.ly/plotly-latest.min.js"></script>
+</head>
+<body>
+    <h1>Cryptocurrency Price Chart</h1>
+
+    <label for="coin">Select Coin:</label>
+    <select id="coin" name="coin">
+        <option value="ETH-USD" selected>ETH-USD</option>  <!-- ETH as default in dropdown -->
+    </select>
+
+    <label for="period">Select Period:</label>
+    <select id="period" name="period">
+        <option value="5d">5 days</option>
+        <option value="1mo">1 month</option>
+        <option value="3mo">3 months</option>
+        <option value="1y">1 year</option>
+    </select>
+
+    <button onclick="fetchData()">Update Chart</button>
+
+    <h2 id="correlation"></h2> <!-- Display correlation here -->
+
+    <div id="chart"></div>
+
+    <script>
+        // Load the list of coins and populate the dropdown
+        async function loadCoins() {
+            const response = await fetch('/get_coins');
+            const coins = await response.json();
+            const coinSelect = document.getElementById('coin');
+
+            // Populate dropdown with coin symbols
+            coins.forEach(coin => {
+                const option = document.createElement('option');
+                option.value = `${coin}`;
+                option.textContent = `${coin}`;
+                coinSelect.appendChild(option);
+            });
+        }
+
+        // Fetch data and plot the chart
+        async function fetchData() {
+            const selectedCoin = document.getElementById('coin').value;
+            const period = document.getElementById('period').value;
+
+            const response = await fetch(`/get_crypto_data_and_correlation?coin=${selectedCoin}&period=${period}`);
+            const result = await response.json();
+
+            const data = result.data;
+            const correlation = result.correlation;
+
+            const dates = ['5d', '1mo'].includes(period) ? data.map(d => d.Datetime):data.map(d => d.Date);
+            const btcPrices = data.map(d => d.Close_BTC);
+            const altPrices = data.map(d => d[`Close_${selectedCoin.split('-')[0]}`]);
+
+            const btcTrace = {
+                x: dates,
+                y: btcPrices,
+                type: 'scatter',
+                mode: 'lines',
+                name: 'BTC Price'
+            };
+
+            const altTrace = {
+                x: dates,
+                y: altPrices,
+                type: 'scatter',
+                mode: 'lines',
+                name: `${selectedCoin} Price`
+            };
+
+            const layout = {
+                title: `BTC vs ${selectedCoin.split('-')[0]} Price over ${period}`,
+                xaxis: { title: 'Date' },
+                yaxis: { title: 'Price (USD)' }
+            };
+
+            Plotly.newPlot('chart', [btcTrace, altTrace], layout);
+
+            // Display correlation
+            document.getElementById('correlation').textContent = `Correlation between BTC and ${selectedCoin.split('-')[0]}: ${correlation.toFixed(2)}`;
+        }
+
+        // Load coins and plot BTC and ETH (as default) when page loads
+        window.onload = function() {
+            loadCoins();
+            fetchData();
+        };
+    </script>
+</body>
+</html>
